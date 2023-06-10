@@ -43,7 +43,7 @@ def upload_file():
         df_result.to_excel(writer, sheet_name='result', index=False)
         df_result_row.to_excel(writer, sheet_name='result_row', index=False)
 
-        writer.save()
+        writer.close()
 
         df_html = df_result.to_html()
 
@@ -168,4 +168,5 @@ def process_xlsx(df):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run(host="0.0.0.0", port=5001)
+    #app.run(port=5001)
