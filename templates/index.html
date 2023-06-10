@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HINE Attendance management</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>work log</h1>
+
+    {% if file_download %}
+        <h2>결과 파일 다운로드</h2>
+        <p><a href="{{ url_for('download_excel', file_download=file_download) }}">Download Result File (xlsx)</a></p>
+    {% endif %}
+
+    <div>{{ df_html | safe }}</div>
+
+
+</body>
+</html>
