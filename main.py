@@ -123,7 +123,6 @@ def process_xlsx(df):
     df_result = pd.merge(df_result, df_late, on='이름')
 
     # 기본 근무 시간 계산
-    #df['기본근무시간'] = df['종료시각'] - df['시작시각'] - timedelta(hours=1)
     df['기본근무시간'] = df.apply(calculate_working_hours, axis=1)
 
     # 기본 근무 시간이 9시간을 넘어갈 경우 9시간으로 변경
