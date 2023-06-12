@@ -63,6 +63,18 @@ def download_excel():
     return send_file(output, as_attachment=True)
 
 
+# 근무 시간 계산 함수
+def calculate_working_hours(row):
+    # 시작시각이 종료시각 보다 클 경우, 철야 근무 한 것으로 판단하여 계산 & 철야는 휴게시간 2 시간 적용
+    if row['종료시각'] < row['시작시각']:
+        working_hours = row['종료시각'] + timedelta(days=1) - row['시작시각'] - timedelta(hours=2)
+
+    #  timedelta(hours=1) 한 시간 씩 빼는 것은 휴게시간을 1시간으로 가정하여 일괄 마이너스 처리
+    else:
+        working_hours = row['종료시각'] - row['시작시각'] - timedelta(hours=1)
+    return working_hours
+
+
 def process_xlsx(df):
     # 1. 결측값 제거
     # 조직 or 근무 정책 컬럼에 '수원'이 포함되었을 경우
@@ -111,7 +123,8 @@ def process_xlsx(df):
     df_result = pd.merge(df_result, df_late, on='이름')
 
     # 기본 근무 시간 계산
-    df['기본근무시간'] = df['종료시각'] - df['시작시각'] - timedelta(hours=1)
+    #df['기본근무시간'] = df['종료시각'] - df['시작시각'] - timedelta(hours=1)
+    df['기본근무시간'] = df.apply(calculate_working_hours, axis=1)
 
     # 기본 근무 시간이 9시간을 넘어갈 경우 9시간으로 변경
     df['기본근무시간'] = df['기본근무시간'].apply(lambda x: timedelta(hours=9) if x > timedelta(hours=9) else x)
@@ -120,7 +133,7 @@ def process_xlsx(df):
     df_result = pd.merge(df_result, df_weekly_time, on='이름', how='inner')
 
     # 전체 근무 시간 계산
-    df['총근무시간'] = df['종료시각'] - df['시작시각'] - timedelta(hours=1)
+    df['총근무시간'] = df.apply(calculate_working_hours, axis=1)
 
     df_time = df.groupby('이름')['총근무시간'].sum()
     df_result = pd.merge(df_result, df_time, on='이름', how='inner')
