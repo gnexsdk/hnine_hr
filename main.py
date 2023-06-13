@@ -134,6 +134,10 @@ def process_xlsx(df):
     # 전체 근무 시간 계산
     df['총근무시간'] = df.apply(calculate_working_hours, axis=1)
 
+    # 조직/직무 정보 추가
+    df_cell = df.groupby('이름').agg({'조직': 'first', '역할(직무)': 'first'}).reset_index()
+    df_result = pd.merge(df_result, df_cell, on='이름', how='inner')
+
     df_time = df.groupby('이름')['총근무시간'].sum()
     df_result = pd.merge(df_result, df_time, on='이름', how='inner')
 
@@ -157,10 +161,10 @@ def process_xlsx(df):
         lambda x: f"{int(x.total_seconds() // 3600)}시간 {int((x.total_seconds() % 3600) // 60)}분")
 
     # 컬럼 순서 변경
-    df_result = df_result[['이름', '일수', '총근무시간', '기본근무시간', '연장', '지각횟수']]
+    df_result = df_result[['이름', '조직', '역할(직무)', '일수', '총근무시간', '기본근무시간', '연장', '지각횟수']]
 
     # 가공 데이터
-    keep = ['이름', '조직', '날짜', '시작시각', '종료시각', '지각', '기본근무시간', '총근무시간']
+    keep = ['이름', '조직', '역할(직무)', '날짜', '시작시각', '종료시각', '지각', '기본근무시간', '총근무시간']
     df = df[keep]
 
     # 날짜 컬럼 값을 가져와서 적용
@@ -180,5 +184,5 @@ def process_xlsx(df):
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5001)
-    #app.run(port=5001)
+    #app.run(host="0.0.0.0", port=5001)
+    app.run(port=5001)
