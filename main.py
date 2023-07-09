@@ -1,15 +1,97 @@
 from datetime import timedelta
+from datetime import datetime
 
 from flask import Flask, request, render_template, send_file
 import pandas as pd
 from openpyxl import Workbook
 from io import BytesIO
 import os
+import re
+from datetime import time
 
 app = Flask(__name__)
 
 # 결과 파일을 저장할 폴더 경로
 RESULT_FOLDER = 'result'
+
+
+@app.route('/overwork', methods=['GET', 'POST'])
+def upload_over_work_file():
+    if request.method == 'POST':
+        # 업로드된 파일 가져오기
+        work_file = request.files['file1']
+        over_work_file = request.files['file2']
+
+        # xlsx 파일 읽기
+        df = pd.read_excel(work_file, sheet_name="result_row")
+        df_over_work = pd.read_excel(over_work_file)
+
+        # xlsx 파일 처리
+        df_original, df_result = process_overwork_xlsx(df, df_over_work)
+
+        # 결과 파일을 로컬에 저장
+        if not os.path.exists(RESULT_FOLDER):
+            os.makedirs(RESULT_FOLDER)
+
+        # 다운로드할 파일 생성
+        original_filename = over_work_file.filename  # 업로드된 파일의 원래 파일명
+        filename, extension = os.path.splitext(original_filename)  # 파일명과 확장자 분리
+        result_filename = f"{filename}_result{extension}"  # 다운로드할 파일의 이름 생성
+
+        result_filepath = os.path.join(RESULT_FOLDER, result_filename)
+
+        # XLSX 파일 생성
+        with pd.ExcelWriter(result_filepath, engine='xlsxwriter') as writer:
+
+            # 각 데이터프레임을 시트로 저장
+            df_original.to_excel(writer, sheet_name='original', index=False)
+            df_result.to_excel(writer, sheet_name='result', index=False)
+
+        df_html = df_result.to_html()
+
+        return render_template('overwork.html', df_html=df_html, over_work_file_download=result_filepath)
+
+    return '''
+    <form method="post" enctype="multipart/form-data">
+      <input type="file" name="file1">근무기록<br><br>
+      <input type="file" name="file2">야근신청서<br><br>
+      <input type="submit" value="업로드">
+    </form>
+    '''
+
+
+def process_overwork_xlsx(df, df_overwork):
+    df_overwork['결과'] = ''
+    df_overwork['날짜'] = pd.to_datetime(df_overwork['야간 근무 일자']).dt.date
+
+    df_overwork['결과'] = '확인필요'
+
+    # df_overwork 데이터프레임을 순회하면서 df와 조건 일치 여부 확인
+    for index, row in df_overwork.iterrows():
+        name = row['이름']
+        date = row['날짜']
+        mask = (df['이름'] == name) & (pd.to_datetime(df['날짜']).dt.date == date)
+        if len(df[mask]) > 0:
+            work_time = df.loc[mask, '총근무시간'].values[0]
+            hour_str, minute_str = work_time.split('시간 ')
+
+            hour = int(hour_str)
+            minute = int(re.sub(r'\D', '', minute_str))
+
+            total_minutes = hour * 60 + minute
+
+            if total_minutes >= 10 * 60:
+                df_overwork.loc[index, '결과'] = '정상'
+
+    df_overwork.drop('날짜', axis=1, inplace=True)
+
+    df_result = pd.DataFrame()
+    df_result['문서 번호'] = df_overwork['문서 번호']
+    df_result['이름'] = df_overwork['이름']
+    df_result['야간 근무 일자'] = df_overwork['야간 근무 일자']
+    df_result['결과'] = df_overwork['결과']
+
+    return df_overwork, df_result
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -55,6 +137,12 @@ def upload_file():
       <input type="submit" value="upload">
     </form>
     '''
+
+
+@app.route('/download_overwork')
+def download_overwork():
+    output = request.args.get('over_work_file_download', None)
+    return send_file(output, as_attachment=True)
 
 
 @app.route('/download_excel')
@@ -112,7 +200,7 @@ def process_xlsx(df):
     df = df.dropna(subset=['시작시각', '종료시각'], how='all')
 
     # 지각 여부 컬럼 추가
-    df['지각'] = df['시작시각'].apply(lambda x: '지각' if x.hour >= 10 else '정상')
+    df['지각'] = df['시작시각'].apply(lambda x: '지각' if x.time() >= pd.Timestamp('1900-01-01 10:30:00').time() else '정상')
 
     # 이름을 기준으로 근무 일수 설정 (여기서 일수 값이 이상하면 출/퇴근 체크를 누락한것)
     df_result = df.groupby('이름').size().reset_index(name='일수')
