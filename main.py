@@ -53,7 +53,7 @@ def upload_over_work_file():
 
     return '''
     <form method="post" enctype="multipart/form-data">
-      <input type="file" name="file1">근무기록<br><br>
+      <input type="file" name="file1">근무기록 Result 파일 업로드<br><br>
       <input type="file" name="file2">야근신청서<br><br>
       <input type="submit" value="업로드">
     </form>
@@ -65,6 +65,8 @@ def process_overwork_xlsx(df, df_overwork):
     df_overwork['날짜'] = pd.to_datetime(df_overwork['야간 근무 일자']).dt.date
 
     df_overwork['결과'] = '확인필요'
+
+    df_overwork['총근무시간'] = ''
 
     # df_overwork 데이터프레임을 순회하면서 df와 조건 일치 여부 확인
     for index, row in df_overwork.iterrows():
@@ -83,12 +85,15 @@ def process_overwork_xlsx(df, df_overwork):
             if total_minutes >= 10 * 60:
                 df_overwork.loc[index, '결과'] = '정상'
 
+            df_overwork.loc[index, '총근무시간'] = work_time
+
     df_overwork.drop('날짜', axis=1, inplace=True)
 
     df_result = pd.DataFrame()
     df_result['문서 번호'] = df_overwork['문서 번호']
     df_result['이름'] = df_overwork['이름']
     df_result['야간 근무 일자'] = df_overwork['야간 근무 일자']
+    df_result['총근무시간'] = df_overwork['총근무시간']
     df_result['결과'] = df_overwork['결과']
 
     return df_overwork, df_result
