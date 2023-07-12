@@ -85,6 +85,9 @@ def process_overwork_xlsx(df, df_overwork):
             if total_minutes >= 10 * 60:
                 df_overwork.loc[index, '결과'] = '정상'
 
+            if row['상태'] == '취소':
+                df_overwork.loc[index, '결과'] = '상신취소'
+
             df_overwork.loc[index, '총근무시간'] = work_time
 
     df_overwork.drop('날짜', axis=1, inplace=True)
