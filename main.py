@@ -14,6 +14,14 @@ app = Flask(__name__)
 # 결과 파일을 저장할 폴더 경로
 RESULT_FOLDER = 'result'
 
+def check_night_shift(x):
+    if isinstance(x, list):
+        return "야간 근무" in x
+    elif isinstance(x, str):
+        return "야간 근무" in x
+    else:
+        return False
+
 
 @app.route('/overwork', methods=['GET', 'POST'])
 def upload_over_work_file():
@@ -62,11 +70,12 @@ def upload_over_work_file():
 
 def process_overwork_xlsx(df, df_overwork):
     df_overwork['결과'] = ''
-    df_overwork['날짜'] = pd.to_datetime(df_overwork['야간 근무 일자']).dt.date
+    df_overwork['날짜'] = pd.to_datetime(df_overwork['근무 일자']).dt.date
 
     df_overwork['결과'] = '확인필요'
 
     df_overwork['총근무시간'] = ''
+    df_overwork = df_overwork[df_overwork["근무 유형"].apply(check_night_shift)]
 
     # df_overwork 데이터프레임을 순회하면서 df와 조건 일치 여부 확인
     for index, row in df_overwork.iterrows():
@@ -95,7 +104,7 @@ def process_overwork_xlsx(df, df_overwork):
     df_result = pd.DataFrame()
     df_result['문서 번호'] = df_overwork['문서 번호']
     df_result['이름'] = df_overwork['이름']
-    df_result['야간 근무 일자'] = df_overwork['야간 근무 일자']
+    df_result['야간 근무 일자'] = df_overwork['근무 일자']
     df_result['총근무시간'] = df_overwork['총근무시간']
     df_result['결과'] = df_overwork['결과']
 
@@ -280,5 +289,5 @@ def process_xlsx(df):
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5001)
-    #app.run(port=5001)
+    #app.run(host="0.0.0.0", port=5001)
+    app.run(port=5001)
