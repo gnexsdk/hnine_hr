@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <title>부고 메일 발송</title>
+   <style>
+       .container {
+           display: flex;
+           gap: 20px;
+           padding: 20px;
+       }
+       .form-section {
+           flex: 1;
+       }
+       .preview-section {
+           flex: 1;
+       }
+       .form-group {
+           margin-bottom: 15px;
+       }
+       label {
+           display: block;
+           margin-bottom: 5px;
+       }
+       .button-group {
+           margin-top: 20px;
+       }
+       .button-group button {
+           margin-right: 10px;
+       }
+       .preview-image {
+           max-width: 100%;
+           border: 1px solid #ccc;
+           margin-top: 10px;
+       }
+       #preview-btn {
+           margin-bottom: 20px;
+       }
+   </style>
+   <script>
+       function validateForm() {
+           var requiredFields = [
+               'team', 'name', 'relation', 'deceased',
+               'date', 'funeral_home', 'address', 'final_date'
+           ];
+
+           for (var field of requiredFields) {
+               if (!document.forms["ripForm"][field].value) {
+                   alert('모든 필드를 입력해주세요.');
+                   return false;
+               }
+           }
+           return true;
+       }
+   </script>
+</head>
+<body>
+   <div class="container">
+       <div class="form-section">
+           <h1>부고 메일 발송</h1>
+
+           <form name="ripForm" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
+               <div class="form-group">
+                   <label>팀/실:</label>
+                   <input type="text" name="team" value="{{ form_data.team }}" required placeholder="예: Visual실">
+               </div>
+
+               <div class="form-group">
+                   <label>이름:</label>
+                   <input type="text" name="name" value="{{ form_data.name }}" required>
+               </div>
+
+               <div class="form-group">
+                   <label>관계 (예: 조부):</label>
+                   <input type="text" name="relation" value="{{ form_data.relation }}" required>
+               </div>
+
+               <div class="form-group">
+                   <label>고인명:</label>
+                   <input type="text" name="deceased" value="{{ form_data.deceased }}" required>
+               </div>
+
+               <div class="form-group">
+                   <label>별세일:</label>
+                   <input type="text" name="date" value="{{ form_data.date }}" required placeholder="2024년 9월 26일 목요일">
+               </div>
+
+               <div class="form-group">
+                   <label>빈소:</label>
+                   <input type="text" name="funeral_home" value="{{ form_data.funeral_home }}" required>
+               </div>
+
+               <div class="form-group">
+                   <label>주소:</label>
+                   <input type="text" name="address" value="{{ form_data.address }}" required>
+               </div>
+
+               <div class="form-group">
+                   <label>발인:</label>
+                   <input type="text" name="final_date" value="{{ form_data.final_date }}" required placeholder="2024년 9월 28일 토요일 오전 6시00분">
+               </div>
+
+               <button type="submit" id="preview-btn">미리보기</button>
+
+               <div class="button-group">
+                   <button type="submit" name="send" value="test">테스트 메일 발송</button>
+                   <button type="submit" name="send" value="all">전체 메일 발송</button>
+               </div>
+           </form>
+       </div>
+
+       <div class="preview-section">
+           <h2>미리보기</h2>
+           {% if preview_image %}
+           <img src="data:image/png;base64,{{ preview_image }}" class="preview-image">
+           {% else %}
+           <p>입력 내용을 모두 입력하고 미리보기 버튼을 클릭하면 이미지가 표시됩니다.</p>
+           {% endif %}
+       </div>
+   </div>
+</body>
+</html>
