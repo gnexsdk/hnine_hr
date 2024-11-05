@@ -135,8 +135,9 @@ def smtp_setting(email, encoded_password):
 
     return smtp
 
+
 def send_rip_mail(sender, receiver, image_data, title_info, is_test=False):
-    msg = MIMEMultipart("mixed")
+    msg = MIMEMultipart('related')  # related로 설정
     msg.set_charset('utf-8')
 
     # 제목 생성
@@ -145,14 +146,28 @@ def send_rip_mail(sender, receiver, image_data, title_info, is_test=False):
     msg['From'] = sender
     msg['To'] = receiver if not is_test else 'hr@hnine.com'
 
-    # 본문 텍스트
-    notice_text = f"경영기획팀에서 안내드립니다.\n\n{title_info['team']} {title_info['name']}님의 {title_info['relation']}(故{title_info['deceased']})님께서 별세하셨기에 삼가 알려드립니다."
-    body_part = MIMEText(notice_text, 'plain', 'utf-8')
-    msg.attach(body_part)
+    # HTML 본문 생성 - 이미지를 본문에 삽입
+    html = f"""
+    <html>
+    <head>
+        <meta charset="utf-8">
+    </head>
+    <body>
+        <div>경영기획팀에서 안내드립니다.</div>
+        <div>{title_info['team']} {title_info['name']}님의 {title_info['relation']}(故{title_info['deceased']})님께서 별세하셨기에 삼가 알려드립니다.</div>
+        <div><img src="cid:rip_image"></div>
+    </body>
+    </html>
+    """
 
-    # 이미지 첨부
+    # HTML 파트 추가
+    html_part = MIMEText(html, 'html', 'utf-8')
+    msg.attach(html_part)
+
+    # 이미지를 본문에 삽입하기 위한 설정
     image = MIMEImage(image_data.getvalue())
     image.add_header('Content-ID', '<rip_image>')
+    image.add_header('Content-Disposition', 'inline')
     msg.attach(image)
 
     # SMTP 설정 및 발송
