@@ -1,18 +1,238 @@
+import os
+import smtplib
+import pandas as pd
+import base64
+from pathlib import Path
+from flask import Flask, request, render_template, send_file
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
+from PIL import Image, ImageDraw, ImageFont  # 이 줄을 추가
+from io import BytesIO
+from email.header import Header
 from datetime import timedelta
 from datetime import datetime
-
-from flask import Flask, request, render_template, send_file
-import pandas as pd
-from openpyxl import Workbook
-from io import BytesIO
-import os
-import re
-from datetime import time
 
 app = Flask(__name__)
 
 # 결과 파일을 저장할 폴더 경로
 RESULT_FOLDER = 'result'
+
+# 기본 파일 경로 설정
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_RIP_DIR = BASE_DIR / 'static' / 'rip'
+DEFAULT_RECIPIENT_FILE = DEFAULT_RIP_DIR / 'recv_list.xlsx'
+DEFAULT_TEMPLATE_FILE = DEFAULT_RIP_DIR / 'mail_body.txt'
+
+
+def create_rip_image(team, name, relation, deceased, date, funeral_home, address, final_date):
+   # 흰색 배경의 이미지 생성
+   width = 800
+   height = 1000
+   image = Image.new('RGB', (width, height), 'white')
+   draw = ImageDraw.Draw(image)
+
+   try:
+       title_font = ImageFont.truetype("malgun.ttf", 30)
+       body_font = ImageFont.truetype("malgun.ttf", 24)
+       address_font = ImageFont.truetype("malgun.ttf", 22)  # 주소용 폰트 크기 작게
+   except:
+       try:
+           # Windows의 맑은 고딕
+           title_font = ImageFont.truetype("C:\\Windows\\Fonts\\malgun.ttf", 30)
+           body_font = ImageFont.truetype("C:\\Windows\\Fonts\\malgun.ttf", 24)
+           address_font = ImageFont.truetype("C:\\Windows\\Fonts\\malgun.ttf", 22)
+       except:
+           try:
+               # Linux 일반적인 폰트 경로
+               title_font = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 30)
+               body_font = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 24)
+               address_font = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", 22)
+           except:
+               try:
+                   # Ubuntu/Debian 계열 폰트 경로
+                   title_font = ImageFont.truetype("/usr/share/fonts/nanum/NanumGothic.ttf", 30)
+                   body_font = ImageFont.truetype("/usr/share/fonts/nanum/NanumGothic.ttf", 24)
+                   address_font = ImageFont.truetype("/usr/share/fonts/nanum/NanumGothic.ttf", 22)
+               except:
+                   try:
+                       # 다른 Linux 폰트 경로
+                       title_font = ImageFont.truetype("/usr/share/fonts/NanumGothic.ttf", 30)
+                       body_font = ImageFont.truetype("/usr/share/fonts/NanumGothic.ttf", 24)
+                       address_font = ImageFont.truetype("/usr/share/fonts/NanumGothic.ttf", 22)
+                   except:
+                       try:
+                           # macOS의 기본 한글 폰트
+                           title_font = ImageFont.truetype("/System/Library/Fonts/AppleGothic.ttf", 30)
+                           body_font = ImageFont.truetype("/System/Library/Fonts/AppleGothic.ttf", 24)
+                           address_font = ImageFont.truetype("/System/Library/Fonts/AppleGothic.ttf", 22)
+                       except Exception as e:
+                           print(f"폰트 로드 실패: {str(e)}")
+                           raise Exception("사용 가능한 한글 폰트를 찾을 수 없습니다.")
+
+   # 제목 작성 및 가운데 정렬
+   title = f"[訃告] {team} {name}님의 {relation}상"
+   title_width = draw.textlength(title, font=title_font)
+   title_x = (width - title_width) / 2
+   draw.text((title_x, 50), title, font=title_font, fill='black')
+
+   # 정보 라인의 시작 위치 계산
+   info_start_x = width * 0.2  # 왼쪽에서 20% 지점에서 시작
+
+   # 본문 작성
+   content_lines = [
+       (f"{name}님의 {relation}(故 {deceased})께서", body_font, True),
+       (f"{date}", body_font, True),
+       ("별세하셨기에 삼가 알려 드립니다.", body_font, True),
+       ("", body_font, True),
+       (f"일  시 : {date}", body_font, False),
+       (f"빈  소 : {funeral_home}", body_font, False),
+       (f"({address})", address_font, False),  # 주소는 괄호로 감싸고 빈소와 같은 위치에서 시작
+       (f"발  인 : {final_date}", body_font, False),
+       ("", body_font, True),
+       ("", body_font, True),
+       ("삼가 고인의 명복을 빕니다.", body_font, True)
+   ]
+
+   # 각 줄을 그리기
+   y = 200
+   for line, font, center_align in content_lines:
+       if line.strip():  # 빈 줄이 아닌 경우
+           if center_align:
+               # 가운데 정렬
+               line_width = draw.textlength(line, font=font)
+               x = (width - line_width) / 2
+           else:
+               # 일정한 위치에서 시작
+               x = info_start_x
+               if line.startswith('('):  # 주소인 경우
+                   # 빈소의 "빈  소 : " 부분 너비 계산
+                   prefix_width = draw.textlength("빈  소 : ", font=body_font)
+                   x = info_start_x + prefix_width
+           draw.text((x, y), line, font=font, fill='black')
+       y += 50  # 줄 간격
+
+   # 이미지를 바이트로 변환
+   img_byte_arr = BytesIO()
+   image.save(img_byte_arr, format='PNG')
+   img_byte_arr.seek(0)
+
+   return img_byte_arr
+
+
+def smtp_setting(email, encoded_password):
+    password = base64.b64decode(encoded_password).decode('utf-8')
+
+    port = 587
+    mail_type = 'smtp.gmail.com'
+    smtp = smtplib.SMTP(mail_type, port)
+    smtp.set_debuglevel(True)
+    smtp.ehlo()
+    smtp.starttls()
+    smtp.login(email, password)
+
+    return smtp
+
+def send_rip_mail(sender, receiver, image_data, title_info, is_test=False):
+    msg = MIMEMultipart("mixed")
+    msg.set_charset('utf-8')
+
+    # 제목 생성
+    mail_title = f"[訃告] {title_info['team']} {title_info['name']}님의 {title_info['relation']}상"
+    msg['Subject'] = mail_title
+    msg['From'] = sender
+    msg['To'] = receiver if not is_test else 'hr@hnine.com'
+
+    # 본문 텍스트
+    notice_text = f"경영기획팀에서 안내드립니다.\n\n{title_info['team']} {title_info['name']}님의 {title_info['relation']}(故{title_info['deceased']})님께서 별세하셨기에 삼가 알려드립니다."
+    body_part = MIMEText(notice_text, 'plain', 'utf-8')
+    msg.attach(body_part)
+
+    # 이미지 첨부
+    image = MIMEImage(image_data.getvalue())
+    image.add_header('Content-ID', '<rip_image>')
+    msg.attach(image)
+
+    # SMTP 설정 및 발송
+    smtp = smtp_setting('hr@hnine.com', 'ZnR2endqZWJieWt3cHdjZw==')
+
+    try:
+        if is_test:
+            smtp.sendmail(sender, 'hr@hnine.com', msg.as_string())
+        else:
+            smtp.sendmail(sender, receiver, msg.as_string())
+        print(f'메일 전송 완료: {receiver if not is_test else "hr@hnine.com"}')
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+        raise e
+    finally:
+        smtp.quit()
+
+
+@app.route('/rip', methods=['GET', 'POST'])
+def rip_mail():
+    preview_image = None
+    # 폼 데이터를 저장할 변수들 초기화
+    form_data = {
+        'team': '',
+        'name': '',
+        'relation': '',
+        'deceased': '',
+        'date': '',
+        'funeral_home': '',
+        'address': '',
+        'final_date': ''
+    }
+
+    if request.method == 'POST':
+        try:
+            # 폼 데이터 가져오기
+            form_data = {
+                'team': request.form['team'],
+                'name': request.form['name'],
+                'relation': request.form['relation'],
+                'deceased': request.form['deceased'],
+                'date': request.form['date'],
+                'funeral_home': request.form['funeral_home'],
+                'address': request.form['address'],
+                'final_date': request.form['final_date']
+            }
+
+            # 이미지 생성
+            image_data = create_rip_image(
+                form_data['team'],
+                form_data['name'],
+                form_data['relation'],
+                form_data['deceased'],
+                form_data['date'],
+                form_data['funeral_home'],
+                form_data['address'],
+                form_data['final_date']
+            )
+
+            # 이미지를 base64로 인코딩하여 HTML에서 표시
+            preview_image = base64.b64encode(image_data.getvalue()).decode('utf-8')
+
+            # 메일 발송 버튼이 클릭된 경우
+            if 'send' in request.form:
+                is_test = request.form['send'] == 'test'
+                # 제목 정보 전달
+                title_info = {
+                    'team': form_data['team'],
+                    'name': form_data['name'],
+                    'relation': form_data['relation'],
+                    'deceased': form_data['deceased']
+                }
+                send_rip_mail('hr@hnine.com', 'h9@hnine.com', image_data, title_info, is_test)
+                return "메일 발송이 완료되었습니다." if not is_test else "테스트 메일이 발송되었습니다."
+
+        except Exception as e:
+            return f"오류 발생: {str(e)}"
+
+    return render_template('rip.html', preview_image=preview_image, form_data=form_data)
+
 
 def check_night_shift(x):
     if isinstance(x, list):
@@ -289,5 +509,5 @@ def process_xlsx(df):
 
 
 if __name__ == '__main__':
-    #app.run(host="0.0.0.0", port=5001)
-    app.run(port=5001)
+    app.run(host="0.0.0.0", port=5001)
+    #app.run(port=5001)
