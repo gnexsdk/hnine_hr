@@ -49,6 +49,12 @@
                    return false;
                }
            }
+
+            var submitButton = document.activeElement;
+            if (submitButton.name === 'send' && submitButton.value === 'all') {
+                return confirm('전체 구성원에게 메일을 발송하시겠습니까?');
+            }
+
            return true;
        }
    </script>
@@ -98,6 +104,11 @@
                    <label>발인:</label>
                    <input type="text" name="final_date" value="{{ form_data.final_date }}" required placeholder="2024년 9월 28일 토요일 오전 6시00분">
                </div>
+
+               <div class="form-group">
+                    <label>부고 관련 URL (선택사항):</label>
+                    <input type="url" name="url" value="{{ form_data.url }}" placeholder="예: http://example.com">
+                </div>
 
                <button type="submit" id="preview-btn">미리보기</button>
 

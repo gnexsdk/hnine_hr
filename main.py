@@ -1,4 +1,5 @@
 import os
+import re
 import smtplib
 import pandas as pd
 import base64
@@ -146,6 +147,8 @@ def send_rip_mail(sender, receiver, image_data, title_info, is_test=False):
     msg['From'] = sender
     msg['To'] = receiver if not is_test else 'hr@hnine.com'
 
+    url_html = f"<div><a href='{title_info['url']}'>온라인 부고장</a></div>" if title_info.get('url') else ""
+
     # HTML 본문 생성 - 이미지를 본문에 삽입
     html = f"""
     <html>
@@ -155,6 +158,8 @@ def send_rip_mail(sender, receiver, image_data, title_info, is_test=False):
     <body>
         <div>경영기획팀에서 안내드립니다.</div>
         <div>{title_info['team']} {title_info['name']}님의 {title_info['relation']}(故{title_info['deceased']})님께서 별세하셨기에 삼가 알려드립니다.</div>
+        <br>
+        {url_html}
         <div><img src="cid:rip_image"></div>
     </body>
     </html>
@@ -198,7 +203,8 @@ def rip_mail():
         'date': '',
         'funeral_home': '',
         'address': '',
-        'final_date': ''
+        'final_date': '',
+        'url': '',
     }
 
     if request.method == 'POST':
@@ -212,7 +218,8 @@ def rip_mail():
                 'date': request.form['date'],
                 'funeral_home': request.form['funeral_home'],
                 'address': request.form['address'],
-                'final_date': request.form['final_date']
+                'final_date': request.form['final_date'],
+                'url': request.form.get('url', '')
             }
 
             # 이미지 생성
@@ -224,7 +231,7 @@ def rip_mail():
                 form_data['date'],
                 form_data['funeral_home'],
                 form_data['address'],
-                form_data['final_date']
+                form_data['final_date'],
             )
 
             # 이미지를 base64로 인코딩하여 HTML에서 표시
@@ -238,7 +245,8 @@ def rip_mail():
                     'team': form_data['team'],
                     'name': form_data['name'],
                     'relation': form_data['relation'],
-                    'deceased': form_data['deceased']
+                    'deceased': form_data['deceased'],
+                    'url': form_data['url']
                 }
                 send_rip_mail('hr@hnine.com', 'h9@hnine.com', image_data, title_info, is_test)
                 return "메일 발송이 완료되었습니다." if not is_test else "테스트 메일이 발송되었습니다."
