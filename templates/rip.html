@@ -4,33 +4,39 @@
 {% block page_title %}부고 메일 발송{% endblock %}
 
 {% block content %}
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+<div class="rip-layout">
+    <!-- 모바일 탭 버튼 -->
+    <div class="mobile-tabs">
+        <button class="tab-btn active" onclick="switchTab('form')" id="tabForm">✏️ 입력</button>
+        <button class="tab-btn" onclick="switchTab('preview')" id="tabPreview">👁️ 미리보기</button>
+    </div>
+
     <!-- Form Section -->
-    <div class="card">
+    <div class="card rip-panel" id="panelForm">
         <div class="card-header">
             <h3>✉️ 부고 정보 입력</h3>
         </div>
         <div class="card-body">
             <form name="ripForm" method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-row">
                     <div class="form-group">
                         <label>팀/실</label>
-                        <input type="text" name="team" value="{{ form_data.team }}" required placeholder="예: Visual실">
+                        <input type="text" name="team" value="{{ form_data.team }}" required placeholder="예: Visual실" autocomplete="off">
                     </div>
                     <div class="form-group">
                         <label>이름</label>
-                        <input type="text" name="name" value="{{ form_data.name }}" required placeholder="직원 이름">
+                        <input type="text" name="name" value="{{ form_data.name }}" required placeholder="직원 이름" autocomplete="off">
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-row">
                     <div class="form-group">
                         <label>관계</label>
-                        <input type="text" name="relation" value="{{ form_data.relation }}" required placeholder="예: 조부">
+                        <input type="text" name="relation" value="{{ form_data.relation }}" required placeholder="예: 조부" autocomplete="off">
                     </div>
                     <div class="form-group">
                         <label>고인명</label>
-                        <input type="text" name="deceased" value="{{ form_data.deceased }}" required placeholder="고인 성함">
+                        <input type="text" name="deceased" value="{{ form_data.deceased }}" required placeholder="고인 성함" autocomplete="off">
                     </div>
                 </div>
 
@@ -59,50 +65,52 @@
                     <input type="url" name="url" value="{{ form_data.url }}" placeholder="https://example.com">
                 </div>
 
-                <div style="display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap;">
-                    <button type="submit" class="btn btn-secondary" id="preview-btn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div class="rip-actions">
+                    <button type="submit" class="btn btn-secondary btn-action" id="preview-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                             <circle cx="12" cy="12" r="3"></circle>
                         </svg>
                         미리보기
                     </button>
-                    <button type="submit" name="send" value="test" class="btn btn-primary">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="22" y1="2" x2="11" y2="13"></line>
-                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                        </svg>
-                        테스트 메일 발송
-                    </button>
-                    <button type="submit" name="send" value="all" class="btn btn-danger">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                            <polyline points="22,6 12,13 2,6"></polyline>
-                        </svg>
-                        전체 메일 발송
-                    </button>
+                    <div class="send-buttons">
+                        <button type="submit" name="send" value="test" class="btn btn-primary btn-action">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            테스트 발송
+                        </button>
+                        <button type="submit" name="send" value="all" class="btn btn-danger btn-action">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                <polyline points="22,6 12,13 2,6"></polyline>
+                            </svg>
+                            전체 발송
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Preview Section -->
-    <div class="card">
-        <div class="card-header">
+    <div class="card rip-panel" id="panelPreview">
+        <div class="card-header desktop-only">
             <h3>👁️ 미리보기</h3>
         </div>
-        <div class="card-body" style="display: flex; align-items: center; justify-content: center; min-height: 400px;">
+        <div class="card-body preview-body">
             {% if preview_image %}
-            <img src="data:image/png;base64,{{ preview_image }}" style="max-width: 100%; border-radius: 8px; box-shadow: var(--shadow-md);">
+            <img src="data:image/png;base64,{{ preview_image }}" class="preview-img">
             {% else %}
-            <div style="text-align: center; color: var(--slate-400);">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px;">
+            <div class="preview-empty">
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                     <circle cx="8.5" cy="8.5" r="1.5"></circle>
                     <polyline points="21 15 16 10 5 21"></polyline>
                 </svg>
-                <p style="font-size: 14px; font-weight: 500;">미리보기 이미지가 여기에 표시됩니다</p>
-                <p style="font-size: 12px; margin-top: 4px;">모든 정보를 입력하고 미리보기를 클릭하세요</p>
+                <p class="preview-empty-title">미리보기 이미지가 여기에 표시됩니다</p>
+                <p class="preview-empty-sub">모든 정보를 입력하고 미리보기를 클릭하세요</p>
             </div>
             {% endif %}
         </div>
@@ -130,14 +138,190 @@
 
         return true;
     }
+
+    function switchTab(tab) {
+        var formPanel = document.getElementById('panelForm');
+        var previewPanel = document.getElementById('panelPreview');
+        var tabForm = document.getElementById('tabForm');
+        var tabPreview = document.getElementById('tabPreview');
+
+        if (tab === 'form') {
+            formPanel.style.display = 'block';
+            previewPanel.style.display = 'none';
+            tabForm.classList.add('active');
+            tabPreview.classList.remove('active');
+        } else {
+            formPanel.style.display = 'none';
+            previewPanel.style.display = 'block';
+            tabForm.classList.remove('active');
+            tabPreview.classList.add('active');
+        }
+    }
+
+    // 미리보기 이미지가 있으면 모바일에서 자동으로 미리보기 탭 전환
+    {% if preview_image %}
+    if (window.innerWidth <= 768) {
+        switchTab('preview');
+    }
+    {% endif %}
 </script>
 {% endblock %}
 
 {% block extra_styles %}
 <style>
+    .rip-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+    }
+
+    .mobile-tabs {
+        display: none;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .rip-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 28px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .send-buttons {
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn-action {
+        white-space: nowrap;
+    }
+
+    .preview-body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+    }
+
+    .preview-img {
+        max-width: 100%;
+        border-radius: 8px;
+        box-shadow: var(--shadow-md);
+    }
+
+    .preview-empty {
+        text-align: center;
+        color: var(--slate-400);
+    }
+
+    .preview-empty svg {
+        margin-bottom: 16px;
+    }
+
+    .preview-empty-title {
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .preview-empty-sub {
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .desktop-only {
+        display: flex;
+    }
+
+    /* ===== 모바일 최적화 ===== */
     @media (max-width: 768px) {
-        div[style*="grid-template-columns: 1fr 1fr"] {
-            grid-template-columns: 1fr !important;
+        .rip-layout {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+
+        .mobile-tabs {
+            display: flex;
+            margin-bottom: 16px;
+            background: var(--white);
+            border-radius: 10px;
+            padding: 4px;
+            border: 1px solid var(--slate-200);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--navy-600);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tab-btn.active {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 2px 8px rgba(59,130,246,0.25);
+        }
+
+        #panelPreview {
+            display: none;
+        }
+
+        .desktop-only {
+            display: none;
+        }
+
+        .preview-body {
+            min-height: 300px;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+
+        .rip-actions {
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--slate-200);
+        }
+
+        .rip-actions .btn-action {
+            width: 100%;
+            justify-content: center;
+            padding: 16px;
+            font-size: 15px;
+            min-height: 52px;
+        }
+
+        .send-buttons {
+            width: 100%;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .send-buttons .btn-action {
+            width: 100%;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .rip-panel .card-body {
+            padding: 16px;
         }
     }
 </style>
