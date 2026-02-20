@@ -513,19 +513,103 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        /* Hamburger button */
+        .hamburger {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            color: var(--navy-800);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Sidebar overlay */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 99;
+            -webkit-backdrop-filter: blur(2px);
+            backdrop-filter: blur(2px);
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* Mobile close button */
+        .sidebar-close {
+            display: none;
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: var(--slate-400);
+            cursor: pointer;
+            padding: 8px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .sidebar {
                 transform: translateX(-100%);
+                width: 280px;
             }
             .sidebar.open {
                 transform: translateX(0);
             }
+            .sidebar-close {
+                display: block;
+            }
+            .hamburger {
+                display: flex;
+                align-items: center;
+            }
             .main-content {
                 margin-left: 0;
+                width: 100%;
+            }
+            .top-bar {
+                padding: 0 16px;
+            }
+            .top-bar h2 {
+                font-size: 16px;
+            }
+            .top-bar-time {
+                display: none;
             }
             .page-content {
+                padding: 16px;
+            }
+            /* 모바일 폼 터치 최적화 */
+            .form-group input[type="text"],
+            .form-group input[type="url"] {
+                font-size: 16px; /* iOS 줌 방지 */
+                padding: 14px;
+            }
+            .btn {
+                padding: 14px 20px;
+                font-size: 15px;
+                min-height: 48px; /* 최소 터치 타겟 */
+            }
+            .card-header {
+                padding: 16px 20px;
+            }
+            .card-body {
                 padding: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .page-content {
+                padding: 12px;
+            }
+            .card {
+                border-radius: 8px;
             }
         }
 
@@ -533,15 +617,24 @@
     </style>
 </head>
 <body>
+    <!-- Sidebar overlay (모바일) -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
     <!-- Sidebar -->
-    <nav class="sidebar">
+    <nav class="sidebar" id="sidebar">
+        <button class="sidebar-close" onclick="closeSidebar()" aria-label="메뉴 닫기">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
         <div class="sidebar-logo">
             <h1>HINE</h1>
             <span>Attendance Management</span>
         </div>
         <div class="sidebar-nav">
             <div class="nav-section-label">근태 관리</div>
-            <a href="/" class="nav-item {% if active_page == 'worklog' %}active{% endif %}">
+            <a href="/" class="nav-item {% if active_page == 'worklog' %}active{% endif %}" onclick="closeSidebar()">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -550,7 +643,7 @@
                 </svg>
                 근무기록 관리
             </a>
-            <a href="/overwork" class="nav-item {% if active_page == 'overwork' %}active{% endif %}">
+            <a href="/overwork" class="nav-item {% if active_page == 'overwork' %}active{% endif %}" onclick="closeSidebar()">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
@@ -559,7 +652,7 @@
             </a>
 
             <div class="nav-section-label" style="margin-top: 8px;">기타</div>
-            <a href="/rip" class="nav-item {% if active_page == 'rip' %}active{% endif %}">
+            <a href="/rip" class="nav-item {% if active_page == 'rip' %}active{% endif %}" onclick="closeSidebar()">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                     <polyline points="22,6 12,13 2,6"></polyline>
@@ -575,7 +668,16 @@
     <!-- Main -->
     <div class="main-content">
         <header class="top-bar">
-            <h2>{% block page_title %}Dashboard{% endblock %}</h2>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <button class="hamburger" onclick="openSidebar()" aria-label="메뉴 열기">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <h2>{% block page_title %}Dashboard{% endblock %}</h2>
+            </div>
             <span class="top-bar-time" id="current-time"></span>
         </header>
         <div class="page-content">
@@ -592,6 +694,18 @@
         }
         updateTime();
         setInterval(updateTime, 30000);
+
+        // Sidebar toggle (모바일)
+        function openSidebar() {
+            document.getElementById('sidebar').classList.add('open');
+            document.getElementById('sidebarOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
     </script>
     {% block extra_scripts %}{% endblock %}
 </body>
