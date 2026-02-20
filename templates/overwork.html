@@ -1,30 +1,182 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>HINE Attendance management</title>
-    <style>
-        table {
-            border-collapse: collapse;
-            width: 100%;
+{% extends "base.html" %}
+
+{% block title %}HINE - 야근 관리{% endblock %}
+{% block page_title %}야근 관리{% endblock %}
+
+{% block content %}
+{% if over_work_file_download %}
+<div class="download-banner">
+    <div class="info">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        <p>야근 기록 처리가 완료되었습니다. 결과를 다운로드하세요.</p>
+    </div>
+    <a href="{{ url_for('download_overwork', over_work_file_download=over_work_file_download) }}" class="btn btn-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        XLSX 다운로드
+    </a>
+</div>
+{% endif %}
+
+{% if df_html %}
+<div class="card">
+    <div class="card-header">
+        <h3>🌙 야근 기록 결과</h3>
+    </div>
+    <div class="card-body" style="overflow-x: auto;">
+        <div class="table-wrapper">{{ df_html | safe }}</div>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-header">
+        <h3>야근 기록 파일 업로드</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data" id="overworkForm">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <div class="file-upload-card">
+                    <div class="file-card-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                        </svg>
+                    </div>
+                    <h4>근무기록 Result 파일</h4>
+                    <p>이전 단계에서 생성된 결과 파일</p>
+                    <div class="file-input-wrapper" style="margin-top: 16px;">
+                        <input type="file" name="file1" id="file1" accept=".xlsx,.xls">
+                    </div>
+                    <p id="file1Name" class="selected-file-name"></p>
+                </div>
+                <div class="file-upload-card">
+                    <div class="file-card-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </div>
+                    <h4>야근 신청서</h4>
+                    <p>야근 신청 내역이 포함된 파일</p>
+                    <div class="file-input-wrapper" style="margin-top: 16px;">
+                        <input type="file" name="file2" id="file2" accept=".xlsx,.xls">
+                    </div>
+                    <p id="file2Name" class="selected-file-name"></p>
+                </div>
+            </div>
+            <div style="margin-top: 24px; text-align: right;">
+                <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    업로드 및 처리
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .file-upload-card {
+        border: 1px solid var(--slate-200);
+        border-radius: var(--radius);
+        padding: 24px;
+        text-align: center;
+        transition: all 0.2s ease;
+        background: var(--slate-50);
+    }
+    .file-upload-card:hover {
+        border-color: var(--accent);
+        box-shadow: var(--shadow-sm);
+    }
+    .file-card-icon {
+        margin-bottom: 12px;
+    }
+    .file-upload-card h4 {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--navy-800);
+        margin-bottom: 4px;
+    }
+    .file-upload-card p {
+        font-size: 12px;
+        color: var(--navy-600);
+    }
+    .selected-file-name {
+        font-size: 13px !important;
+        color: var(--accent) !important;
+        font-weight: 600 !important;
+        min-height: 20px;
+    }
+    .table-wrapper table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    .table-wrapper thead th {
+        background: var(--slate-50);
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 12px;
+        color: var(--navy-600);
+        border-bottom: 2px solid var(--slate-200);
+        white-space: nowrap;
+    }
+    .table-wrapper tbody td {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--slate-100);
+        color: var(--navy-800);
+    }
+    .table-wrapper tbody tr:hover {
+        background: var(--slate-50);
+    }
+    @media (max-width: 768px) {
+        .file-upload-card + .file-upload-card { margin-top: 16px; }
+        div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const file1 = document.getElementById('file1');
+    const file2 = document.getElementById('file2');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function checkFiles() {
+        if (file1 && file2 && submitBtn) {
+            submitBtn.disabled = !(file1.files.length > 0 && file2.files.length > 0);
         }
+    }
 
-        th, td {
-            padding: 8px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-    </style>
-</head>
-<body>
-    <h1>over work log</h1>
-
-    {% if over_work_file_download %}
-        <h2>결과 파일 다운로드</h2>
-        <p><a href="{{ url_for('download_overwork', over_work_file_download=over_work_file_download) }}">Download Result File (xlsx)</a></p>
-    {% endif %}
-
-    <div>{{ df_html | safe }}</div>
-
-
-</body>
-</html>
+    if (file1) {
+        file1.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                document.getElementById('file1Name').textContent = '📄 ' + this.files[0].name;
+            }
+            checkFiles();
+        });
+    }
+    if (file2) {
+        file2.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                document.getElementById('file2Name').textContent = '📄 ' + this.files[0].name;
+            }
+            checkFiles();
+        });
+    }
+</script>
+{% endblock %}
