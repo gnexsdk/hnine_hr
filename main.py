@@ -1,5 +1,7 @@
 import os
 import re
+import json
+import uuid
 import logging
 import smtplib
 import pandas as pd
@@ -558,6 +560,135 @@ def process_xlsx(df):
 
     logger.info(f"근무기록 처리 완료: {len(df_result)}명")
     return df_result, df
+
+
+# ============================================================
+# 단체 메일 발송
+# ============================================================
+def send_bulk_mail(sender, recipients, subject_template, body_template, is_test=False):
+    logger.info(f"단체 메일 발송 시작 - 수신자 수: {len(recipients)}, 테스트: {is_test}")
+    smtp = smtp_setting(sender, 'ZnR2endqZWJieWt3cHdjZw==')
+    sent_count = 0
+    failed = []
+
+    try:
+        targets = recipients[:1] if is_test else recipients
+        for row in targets:
+            email = row['email']
+            subject = subject_template
+            body = body_template
+            for key, val in row.items():
+                if key != 'email':
+                    subject = subject.replace('{' + key + '}', str(val))
+                    body = body.replace('{' + key + '}', str(val))
+
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = Header(subject, 'utf-8')
+            msg['From'] = sender
+            msg['To'] = 'hr@hnine.com' if is_test else email
+
+            html = f"<html><head><meta charset='utf-8'></head><body style='font-family:\"Noto Sans KR\",sans-serif;font-size:14px;line-height:1.7;color:#1e293b;'>{body}</body></html>"
+            msg.attach(MIMEText(html, 'html', 'utf-8'))
+
+            target_addr = 'hr@hnine.com' if is_test else email
+            smtp.sendmail(sender, target_addr, msg.as_string())
+            sent_count += 1
+            logger.info(f"메일 전송 완료: {target_addr}")
+    except Exception as e:
+        logger.error(f"메일 전송 실패: {str(e)}", exc_info=True)
+        raise e
+    finally:
+        smtp.quit()
+
+    logger.info(f"단체 메일 발송 완료 - {sent_count}건")
+    return sent_count, failed
+
+
+@app.route('/bulk_mail', methods=['GET', 'POST'])
+def bulk_mail():
+    columns = []
+    preview_rows = []
+    form_data = {'subject': '', 'body': ''}
+    result = None
+    error = None
+    total_count = 0
+    session_id = request.form.get('session_id') or str(uuid.uuid4())
+
+    if not os.path.exists(RESULT_FOLDER):
+        os.makedirs(RESULT_FOLDER)
+    temp_file = os.path.join(RESULT_FOLDER, f'bulk_temp_{session_id}.json')
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'preview')
+        subject = request.form.get('subject', '')
+        body = request.form.get('body', '')
+        form_data = {'subject': subject, 'body': body}
+
+        excel_file = request.files.get('excel_file')
+        recipients = None
+
+        if excel_file and excel_file.filename:
+            try:
+                df = pd.read_excel(excel_file)
+                col_names = list(df.columns)
+                email_col = col_names[0]
+                var_cols = col_names[1:]
+
+                recipients = []
+                for _, row in df.iterrows():
+                    record = {'email': str(row[email_col]).strip()}
+                    for col in var_cols:
+                        record[col] = str(row[col]) if pd.notna(row[col]) else ''
+                    recipients.append(record)
+
+                with open(temp_file, 'w', encoding='utf-8') as f:
+                    json.dump({'recipients': recipients, 'columns': list(var_cols)}, f, ensure_ascii=False)
+
+                columns = list(var_cols)
+                app.logger.info(f"엑셀 업로드 완료: {len(recipients)}명, 컬럼: {columns}")
+            except Exception as e:
+                error = f"엑셀 파일 처리 오류: {str(e)}"
+                app.logger.error(f"엑셀 처리 오류: {str(e)}", exc_info=True)
+
+        elif os.path.exists(temp_file):
+            with open(temp_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            recipients = data['recipients']
+            columns = data['columns']
+
+        if recipients is not None and not error:
+            preview_rows = recipients
+            total_count = len(recipients)
+
+            if action in ('test', 'send'):
+                if not subject.strip():
+                    error = "메일 제목을 입력해주세요."
+                else:
+                    try:
+                        is_test = (action == 'test')
+                        sent_count, _ = send_bulk_mail('hr@hnine.com', recipients, subject, body, is_test)
+                        if is_test:
+                            result = {'type': 'success', 'message': f'테스트 메일을 hr@hnine.com으로 발송했습니다. (첫 번째 수신자 데이터 적용)'}
+                        else:
+                            result = {'type': 'success', 'message': f'총 {sent_count}명에게 메일을 발송했습니다.'}
+                            if os.path.exists(temp_file):
+                                os.remove(temp_file)
+                            session_id = str(uuid.uuid4())
+                    except Exception as e:
+                        error = f"메일 발송 오류: {str(e)}"
+                        app.logger.error(f"단체 메일 발송 오류: {str(e)}", exc_info=True)
+        elif not error and action in ('test', 'send'):
+            error = "엑셀 파일을 먼저 업로드해주세요."
+
+    return render_template('bulk_mail.html',
+                           columns=columns,
+                           preview_rows=preview_rows,
+                           form_data=form_data,
+                           active_page='bulk_mail',
+                           total_count=total_count,
+                           result=result,
+                           error=error,
+                           session_id=session_id)
 
 
 if __name__ == '__main__':
