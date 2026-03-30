@@ -1,0 +1,964 @@
+{% extends "base.html" %}
+
+{% block title %}HINE - 단체 메일 발송{% endblock %}
+{% block page_title %}단체 메일 발송{% endblock %}
+
+{% block content %}
+<form name="bulkForm" method="post" enctype="multipart/form-data" onsubmit="return validateForm(event)">
+    <input type="hidden" name="session_id" value="{{ session_id }}">
+
+    <div class="bulk-layout">
+
+        <!-- 왼쪽: 설정 패널 -->
+        <div class="bulk-left">
+
+            <!-- 엑셀 업로드 -->
+            <div class="card" style="margin-bottom: 20px;">
+                <div class="card-header">
+                    <h3>📂 수신자 엑셀 업로드</h3>
+                </div>
+                <div class="card-body">
+
+                    <!-- 엑셀 형식 안내 -->
+                    <div class="excel-guide">
+                        <p class="guide-title">📋 엑셀 파일 작성 방법</p>
+                        <p class="guide-desc">아래와 같이 첫 번째 열에 이메일 주소를 입력하고, 그 오른쪽 열부터 메일에 넣을 내용을 자유롭게 추가하세요.<br>첫 번째 행(헤더)의 이름이 메일 본문에서 사용할 <strong>변수명</strong>이 됩니다.</p>
+                        <div class="excel-table-wrap">
+                            <table class="excel-sample">
+                                <thead>
+                                    <tr>
+                                        <th class="col-email">
+                                            <span class="col-fixed-badge">필수</span>
+                                            이메일
+                                        </th>
+                                        <th><span class="col-optional-badge">선택</span>이름</th>
+                                        <th><span class="col-optional-badge">선택</span>부서</th>
+                                        <th class="col-etc">… (자유롭게 추가)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="col-email">hong@hnine.com</td>
+                                        <td>홍길동</td>
+                                        <td>개발팀</td>
+                                        <td class="col-etc">…</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="col-email">kim@hnine.com</td>
+                                        <td>김철수</td>
+                                        <td>마케팅팀</td>
+                                        <td class="col-etc">…</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="guide-arrow">↓ 메일 본문에 이렇게 사용하세요</p>
+                        <div class="guide-example">
+                            안녕하세요, <span class="inline-var">{이름}</span>님.<br>
+                            <span class="inline-var">{부서}</span> 소속으로 안내드립니다.
+                        </div>
+                        <p class="guide-result-label">→ 실제 발송 시 각 수신자에 맞게 자동으로 채워집니다</p>
+                    </div>
+
+                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('excelInput').click()">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <h4 id="uploadLabel">엑셀 파일을 클릭하거나 드래그하여 업로드</h4>
+                        <p>.xlsx, .xls 파일 지원</p>
+                    </div>
+                    <input type="file" name="excel_file" id="excelInput" accept=".xlsx,.xls" style="display:none" onchange="onFileSelect(this); autoPreview()">
+
+                    {% if columns %}
+                    <div class="variable-section">
+                        <p class="var-label">
+                            사용 가능한 변수
+                            <span class="badge badge-success">총 {{ total_count }}명</span>
+                        </p>
+                        <div class="var-chips">
+                            {% for col in columns %}
+                            <span class="var-chip" onclick="insertVar('{{ '{' + col + '}' }}')">
+                                <span class="var-chip-label">{{ col }}</span>
+                                <span class="var-chip-bracket">{{'{'}}{{ col }}{{'}'}}</span>
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 메일 작성 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>✉️ 메일 작성</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>메일 제목</label>
+                        <input type="text" name="subject" id="subjectInput"
+                               value="{{ form_data.subject }}"
+                               placeholder="예: {이름}님께 안내드립니다"
+                               autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label>메일 본문</label>
+                        <!-- 에디터 툴바 -->
+                        <div class="editor-toolbar">
+                            <button type="button" class="tool-btn" onclick="fmt('bold')" title="굵게 (Ctrl+B)"><b>B</b></button>
+                            <button type="button" class="tool-btn" onclick="fmt('italic')" title="기울임 (Ctrl+I)"><i>I</i></button>
+                            <button type="button" class="tool-btn" onclick="fmt('underline')" title="밑줄 (Ctrl+U)"><u>U</u></button>
+                            <div class="tool-sep"></div>
+                            <label class="tool-btn tool-color" title="글자 색상">
+                                <span id="colorDot" style="background:#000"></span>
+                                <input type="color" id="colorPicker" value="#000000" oninput="applyColor(this.value)" onchange="applyColor(this.value)">
+                            </label>
+                            <div class="tool-sep"></div>
+                            <div class="tool-table-wrap" title="표 삽입">
+                                <button type="button" class="tool-btn" id="tableBtn" onclick="toggleTablePicker()">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="3" width="18" height="18" rx="1"></rect>
+                                        <line x1="3" y1="9" x2="21" y2="9"></line>
+                                        <line x1="3" y1="15" x2="21" y2="15"></line>
+                                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                                        <line x1="15" y1="3" x2="15" y2="21"></line>
+                                    </svg>
+                                    표 삽입
+                                </button>
+                                <div class="table-picker" id="tablePicker">
+                                    <p class="picker-label" id="pickerLabel">표 크기 선택</p>
+                                    <div class="picker-grid" id="pickerGrid"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- contenteditable 에디터 -->
+                        <div id="bodyEditor" class="body-editor" contenteditable="true"
+                             data-placeholder="예: 안녕하세요, {이름}님.&#10;&#10;{부서} 소속으로 안내 드립니다."></div>
+                        <textarea name="body" id="bodyInput" style="display:none">{{ form_data.body }}</textarea>
+                    </div>
+
+                    <!-- 액션 버튼 -->
+                    <div class="action-bar">
+                        <input type="hidden" name="action" id="actionInput" value="preview">
+                        <div class="send-group">
+                            <button type="submit" class="btn btn-primary" title="hr@hnine.com으로 테스트 발송 (첫 번째 수신자의 데이터 적용)" onclick="document.getElementById('actionInput').value='test'">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                                테스트 발송
+                            </button>
+                            <button type="submit" class="btn btn-danger" id="sendAllBtn" onclick="document.getElementById('actionInput').value='send'">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg>
+                                전체 발송 {% if total_count %}({{ total_count }}명){% endif %}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 미리보기 패널 -->
+        <div class="bulk-right">
+            <div class="card" style="position: sticky; top: 80px;">
+                <div class="card-header">
+                    <h3>👁️ 미리보기</h3>
+                    {% if total_count %}
+                    <span class="badge badge-success">총 {{ total_count }}명</span>
+                    {% endif %}
+                </div>
+                <div class="card-body preview-area">
+
+                    <!-- 결과 메시지 -->
+                    {% if result %}
+                    <div class="result-banner result-{{ result.type }}">
+                        {% if result.type == 'success' %}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        {% endif %}
+                        {{ result.message }}
+                    </div>
+                    {% endif %}
+
+                    {% if error %}
+                    <div class="result-banner result-error">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        {{ error }}
+                    </div>
+                    {% endif %}
+
+                    {% if preview_rows %}
+                    <!-- 메일 미리보기 (첫 번째 수신자 기준) -->
+                    <div class="mail-preview">
+                        <div class="mail-preview-header">
+                            <p class="mail-preview-label">메일 미리보기 (첫 번째 수신자 기준)</p>
+                        </div>
+                        <div class="mail-preview-body" id="previewContent">
+                            <p class="preview-placeholder">제목과 본문을 입력하면 여기에 미리보기가 표시됩니다.</p>
+                        </div>
+                    </div>
+
+                    <!-- 수신자 목록 -->
+                    <div class="recipient-list">
+                        <p class="recipient-list-title">수신자 목록</p>
+                        <div class="table-wrapper">
+                            <table class="styled-table">
+                                <thead>
+                                    <tr>
+                                        <th>이메일</th>
+                                        {% for col in columns %}
+                                        <th>{{ col }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in preview_rows %}
+                                    <tr>
+                                        <td>{{ row.email }}</td>
+                                        {% for col in columns %}
+                                        <td>{{ row[col] }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="preview-empty-state">
+                        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        <p>엑셀을 업로드하고 미리보기를 클릭하세요</p>
+                        <p class="hint-sub">1열: 이메일 주소<br>2열~: 변수 데이터</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+</form>
+
+<script>
+    // ── 파일 업로드 ──────────────────────────────────────────
+    function onFileSelect(input) {
+        if (input.files && input.files[0]) {
+            document.getElementById('uploadLabel').textContent = input.files[0].name;
+            document.getElementById('uploadZone').style.borderColor = 'var(--accent)';
+            document.getElementById('uploadZone').style.background = 'var(--accent-light)';
+        }
+    }
+
+    function autoPreview() {
+        syncEditor();
+        document.getElementById('actionInput').value = 'preview';
+        document.querySelector('form[name="bulkForm"]').submit();
+    }
+
+    var zone = document.getElementById('uploadZone');
+    zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', function() { zone.classList.remove('dragover'); });
+    zone.addEventListener('drop', function(e) {
+        e.preventDefault(); zone.classList.remove('dragover');
+        var files = e.dataTransfer.files;
+        if (files.length > 0) { document.getElementById('excelInput').files = files; onFileSelect(document.getElementById('excelInput')); autoPreview(); }
+    });
+
+    // ── 에디터 초기화 ─────────────────────────────────────────
+    var editor = document.getElementById('bodyEditor');
+    var hiddenBody = document.getElementById('bodyInput');
+
+    // 저장된 본문이 있으면 에디터에 복원
+    (function() {
+        var saved = hiddenBody.value;
+        if (saved && saved.trim()) {
+            editor.innerHTML = saved;
+        }
+    })();
+
+    // 에디터 → hidden textarea 동기화
+    function syncEditor() {
+        hiddenBody.value = editor.innerHTML;
+    }
+
+    // placeholder 처리
+    editor.addEventListener('focus', function() { if (editor.innerHTML === '') editor.classList.remove('empty'); });
+    editor.addEventListener('blur', function() { if (editor.innerHTML === '' || editor.innerHTML === '<br>') editor.classList.add('empty'); });
+    editor.addEventListener('input', function() { syncEditor(); updatePreview(); });
+    if (!editor.innerHTML.trim()) editor.classList.add('empty');
+
+    // ── 서식 도구 ─────────────────────────────────────────────
+    function fmt(cmd) { editor.focus(); document.execCommand(cmd, false, null); }
+
+    var savedColorRange = null;
+    document.querySelector('.tool-color').addEventListener('mousedown', function() {
+        var sel = window.getSelection();
+        if (sel.rangeCount > 0) savedColorRange = sel.getRangeAt(0).cloneRange();
+    });
+
+    function applyColor(val) {
+        document.getElementById('colorDot').style.background = val;
+        if (savedColorRange) {
+            editor.focus();
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedColorRange);
+            document.execCommand('styleWithCSS', false, true);
+            document.execCommand('foreColor', false, val);
+            syncEditor();
+            updatePreview();
+        }
+    }
+
+    // ── 표 삽입 ───────────────────────────────────────────────
+    var COLS = 6, ROWS = 6;
+    var pickerGrid = document.getElementById('pickerGrid');
+    var pickerLabel = document.getElementById('pickerLabel');
+    var savedRange = null;
+
+    // 그리드 생성
+    for (var r = 0; r < ROWS; r++) {
+        for (var c = 0; c < COLS; c++) {
+            (function(row, col) {
+                var cell = document.createElement('div');
+                cell.className = 'picker-cell';
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+                cell.addEventListener('mouseover', function() { highlightGrid(row, col); });
+                cell.addEventListener('click', function() { insertTable(row + 1, col + 1); });
+                pickerGrid.appendChild(cell);
+            })(r, c);
+        }
+    }
+
+    function highlightGrid(maxRow, maxCol) {
+        pickerGrid.querySelectorAll('.picker-cell').forEach(function(cell) {
+            var r = parseInt(cell.dataset.row), c = parseInt(cell.dataset.col);
+            cell.classList.toggle('active', r <= maxRow && c <= maxCol);
+        });
+        pickerLabel.textContent = (maxRow + 1) + ' × ' + (maxCol + 1) + ' 표';
+    }
+
+    function toggleTablePicker() {
+        var picker = document.getElementById('tablePicker');
+        var visible = picker.classList.toggle('open');
+        if (visible) {
+            // 커서 위치 저장
+            var sel = window.getSelection();
+            if (sel.rangeCount > 0) savedRange = sel.getRangeAt(0).cloneRange();
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.tool-table-wrap')) {
+            document.getElementById('tablePicker').classList.remove('open');
+            pickerLabel.textContent = '표 크기 선택';
+            pickerGrid.querySelectorAll('.picker-cell').forEach(function(c) { c.classList.remove('active'); });
+        }
+    });
+
+    function insertTable(rows, cols) {
+        document.getElementById('tablePicker').classList.remove('open');
+        editor.focus();
+
+        // 저장된 커서 위치 복원
+        if (savedRange) {
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedRange);
+        }
+
+        var table = '<table border="1" style="border-collapse:collapse;width:100%;margin:8px 0;">';
+        for (var r = 0; r < rows; r++) {
+            table += '<tr>';
+            for (var c = 0; c < cols; c++) {
+                table += '<td style="padding:6px 10px;border:1px solid #ccc;min-width:60px;">&nbsp;</td>';
+            }
+            table += '</tr>';
+        }
+        table += '</table><p><br></p>';
+        document.execCommand('insertHTML', false, table);
+        syncEditor();
+        updatePreview();
+    }
+
+    // ── 변수 삽입 ─────────────────────────────────────────────
+    function insertVar(varText) {
+        editor.focus();
+        document.execCommand('insertText', false, varText);
+        syncEditor();
+        updatePreview();
+    }
+
+    // ── 실시간 미리보기 ───────────────────────────────────────
+    {% if preview_rows %}
+    var firstRow = {{ preview_rows[0] | tojson }};
+
+    function applyVars(html) {
+        for (var key in firstRow) {
+            if (key !== 'email') {
+                html = html.split('{' + key + '}').join(firstRow[key]);
+            }
+        }
+        return html;
+    }
+
+    function updatePreview() {
+        var subject = document.getElementById('subjectInput').value;
+        var body = editor.innerHTML;
+        var renderedSubject = subject.replace(/\{([^}]+)\}/g, function(m, k) { return firstRow[k] !== undefined ? firstRow[k] : m; });
+        var renderedBody = applyVars(body);
+        var container = document.getElementById('previewContent');
+        container.innerHTML =
+            '<div class="preview-subject"><strong>제목:</strong> ' + (renderedSubject || '<em style="color:var(--slate-400)">제목 없음</em>') + '</div>' +
+            '<div class="preview-to"><strong>수신:</strong> ' + firstRow['email'] + '</div>' +
+            '<hr style="border:none;border-top:1px solid var(--slate-200);margin:12px 0">' +
+            '<div class="preview-body-text">' + (renderedBody || '<em style="color:var(--slate-400)">본문 없음</em>') + '</div>';
+    }
+
+    document.getElementById('subjectInput').addEventListener('input', updatePreview);
+    updatePreview();
+    {% else %}
+    function updatePreview() {}
+    {% endif %}
+
+    // ── 폼 제출 ───────────────────────────────────────────────
+    function validateForm(e) {
+        syncEditor();
+        var action = document.getElementById('actionInput').value;
+        if (action === 'send') {
+            var count = {{ total_count or 0 }};
+            if (count === 0) { alert('엑셀 파일을 먼저 업로드하세요.'); return false; }
+            return confirm('총 ' + count + '명에게 메일을 발송하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.');
+        }
+        if (action === 'test') { syncEditor(); }
+        return true;
+    }
+</script>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .bulk-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        align-items: start;
+    }
+
+    .bulk-left {
+        min-width: 0;
+    }
+
+    .bulk-right {
+        min-width: 0;
+    }
+
+    /* 엑셀 안내 */
+    .excel-guide {
+        background: var(--slate-50);
+        border: 1px solid var(--slate-200);
+        border-radius: 10px;
+        padding: 18px 20px;
+        margin-bottom: 20px;
+    }
+
+    .guide-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--navy-800);
+        margin-bottom: 6px;
+    }
+
+    .guide-desc {
+        font-size: 12px;
+        color: var(--navy-600);
+        line-height: 1.7;
+        margin-bottom: 14px;
+    }
+
+    .excel-table-wrap {
+        overflow-x: auto;
+        margin-bottom: 12px;
+    }
+
+    .excel-sample {
+        border-collapse: collapse;
+        font-size: 12px;
+        width: 100%;
+        min-width: 360px;
+    }
+
+    .excel-sample thead th {
+        background: #e2f0d9;
+        color: #375623;
+        padding: 7px 14px;
+        text-align: left;
+        border: 1px solid #c6d9b0;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .excel-sample thead th.col-email {
+        background: #dae3f3;
+        color: #1f3864;
+        border-color: #b4c7e7;
+        position: relative;
+    }
+
+    .excel-sample tbody td {
+        padding: 6px 14px;
+        border: 1px solid #d0d0d0;
+        color: var(--navy-800);
+        background: white;
+    }
+
+    .excel-sample tbody td.col-email {
+        background: #f2f6fc;
+        color: #1f3864;
+        font-weight: 500;
+    }
+
+    .col-fixed-badge {
+        display: inline-block;
+        background: #1f3864;
+        color: white;
+        font-size: 9px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        margin-right: 4px;
+        vertical-align: middle;
+        font-weight: 700;
+    }
+
+    .col-optional-badge {
+        display: inline-block;
+        background: #6b7280;
+        color: white;
+        font-size: 9px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        margin-right: 4px;
+        vertical-align: middle;
+        font-weight: 700;
+    }
+
+    .col-etc {
+        color: var(--slate-400) !important;
+        font-style: italic;
+    }
+
+    .guide-arrow {
+        font-size: 13px;
+        color: var(--navy-600);
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .guide-example {
+        background: white;
+        border: 1px solid var(--slate-300);
+        border-radius: 6px;
+        padding: 12px 14px;
+        font-size: 13px;
+        color: var(--navy-700);
+        line-height: 2;
+        margin-bottom: 8px;
+    }
+
+    .inline-var {
+        display: inline-block;
+        padding: 1px 7px;
+        background: var(--accent-light);
+        color: var(--accent);
+        border: 1px solid #bfdbfe;
+        border-radius: 4px;
+        font-weight: 600;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+    }
+
+    .guide-result-label {
+        font-size: 11px;
+        color: var(--slate-400);
+    }
+
+    /* 변수 섹션 */
+    .variable-section {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--slate-200);
+    }
+
+    .var-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--navy-600);
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .var-desc {
+        font-size: 11px;
+        color: var(--slate-400);
+        margin-bottom: 10px;
+    }
+
+    .var-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .var-chip {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 6px 14px;
+        background: var(--accent-light);
+        color: var(--accent);
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        user-select: none;
+        gap: 2px;
+    }
+
+    .var-chip:hover {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+    }
+
+    .var-chip-label {
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .var-chip-bracket {
+        font-size: 10px;
+        font-family: 'Courier New', monospace;
+        opacity: 0.7;
+    }
+
+    .var-chip:hover .var-chip-bracket {
+        opacity: 0.9;
+    }
+
+    /* 에디터 툴바 */
+    .editor-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 10px;
+        background: var(--slate-50);
+        border: 1px solid var(--slate-300);
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        flex-wrap: wrap;
+    }
+
+    .tool-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 10px;
+        border: 1px solid transparent;
+        border-radius: 5px;
+        background: none;
+        font-size: 13px;
+        font-family: inherit;
+        color: var(--navy-700);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .tool-btn:hover { background: var(--slate-200); border-color: var(--slate-300); }
+
+    .tool-sep { width: 1px; height: 20px; background: var(--slate-300); margin: 0 4px; }
+
+    .tool-color { cursor: pointer; position: relative; }
+    .tool-color input[type="color"] { position: absolute; opacity: 0; width: 0; height: 0; }
+    #colorDot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #ccc; }
+
+    /* 표 피커 */
+    .tool-table-wrap { position: relative; }
+
+    .table-picker {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        background: white;
+        border: 1px solid var(--slate-200);
+        border-radius: 8px;
+        padding: 12px;
+        box-shadow: var(--shadow-md);
+        z-index: 200;
+    }
+
+    .table-picker.open { display: block; }
+
+    .picker-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--navy-600);
+        text-align: center;
+        margin-bottom: 8px;
+    }
+
+    .picker-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 20px);
+        gap: 3px;
+    }
+
+    .picker-cell {
+        width: 20px;
+        height: 20px;
+        border: 1px solid var(--slate-300);
+        border-radius: 2px;
+        cursor: pointer;
+        transition: background 0.1s, border-color 0.1s;
+    }
+
+    .picker-cell.active { background: var(--accent-light); border-color: var(--accent); }
+    .picker-cell:hover { border-color: var(--accent); }
+
+    /* contenteditable 에디터 */
+    .body-editor {
+        width: 100%;
+        min-height: 280px;
+        padding: 12px 14px;
+        border: 1px solid var(--slate-300);
+        border-radius: 0 0 8px 8px;
+        font-size: 14px;
+        font-family: 'Noto Sans KR', sans-serif;
+        color: var(--navy-800);
+        line-height: 1.7;
+        outline: none;
+        background: var(--white);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        overflow-y: auto;
+    }
+
+    .body-editor:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+    }
+
+    .body-editor:focus + .editor-toolbar,
+    .editor-toolbar:has(+ .body-editor:focus) { border-color: var(--accent); }
+
+    .body-editor.empty::before {
+        content: attr(data-placeholder);
+        color: var(--slate-400);
+        pointer-events: none;
+        white-space: pre-line;
+    }
+
+    .body-editor table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+    .body-editor td, .body-editor th { border: 1px solid #ccc; padding: 6px 10px; min-width: 60px; }
+
+    /* 액션 버튼 */
+    .action-bar {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .send-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    /* 결과 배너 */
+    .result-banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 16px;
+    }
+
+    .result-success {
+        background: var(--success-light);
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+    }
+
+    .result-error {
+        background: var(--danger-light);
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+    }
+
+    /* 메일 미리보기 */
+    .mail-preview {
+        background: var(--slate-50);
+        border: 1px solid var(--slate-200);
+        border-radius: 8px;
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+
+    .mail-preview-header {
+        padding: 10px 14px;
+        background: var(--slate-200);
+        border-bottom: 1px solid var(--slate-300);
+    }
+
+    .mail-preview-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--navy-600);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .mail-preview-body {
+        padding: 16px;
+        font-size: 13px;
+        color: var(--navy-800);
+        min-height: 80px;
+    }
+
+    .preview-subject {
+        margin-bottom: 4px;
+    }
+
+    .preview-to {
+        font-size: 12px;
+        color: var(--navy-600);
+    }
+
+    .preview-body-text {
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .preview-placeholder {
+        color: var(--slate-400);
+        font-style: italic;
+        font-size: 13px;
+    }
+
+    /* 수신자 목록 */
+    .recipient-list {
+        margin-top: 4px;
+    }
+
+    .recipient-list-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--navy-600);
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+        border-radius: 8px;
+        border: 1px solid var(--slate-200);
+    }
+
+    .more-hint {
+        font-size: 12px;
+        color: var(--slate-400);
+        text-align: center;
+        padding: 8px;
+    }
+
+    /* 비어있는 상태 */
+    .preview-empty-state {
+        text-align: center;
+        color: var(--slate-400);
+        padding: 40px 20px;
+    }
+
+    .preview-empty-state svg {
+        margin-bottom: 16px;
+    }
+
+    .preview-empty-state p {
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 6px;
+    }
+
+    .hint-sub {
+        font-size: 12px;
+        font-weight: 400 !important;
+        color: var(--slate-400);
+        line-height: 1.8;
+    }
+
+    .preview-area {
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+    }
+
+    /* 반응형 */
+    @media (max-width: 900px) {
+        .bulk-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .bulk-right .card {
+            position: static !important;
+        }
+
+        .preview-area {
+            max-height: none;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .action-bar {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .action-bar .btn,
+        .send-group .btn {
+            width: 100%;
+            justify-content: center;
+            min-height: 48px;
+            font-size: 15px;
+        }
+
+        .send-group {
+            width: 100%;
+            flex-direction: column;
+        }
+
+        textarea[name="body"] {
+            font-size: 16px;
+        }
+    }
+</style>
+{% endblock %}
