@@ -5,6 +5,7 @@ import uuid
 import logging
 import smtplib
 import pandas as pd
+from openpyxl import load_workbook
 import base64
 from pathlib import Path
 from flask import Flask, request, render_template, send_file
@@ -565,6 +566,23 @@ def process_xlsx(df):
 # ============================================================
 # 단체 메일 발송
 # ============================================================
+def _cell_display_value(cell):
+    """openpyxl 셀 값을 Excel 표시 서식에 맞게 문자열로 반환"""
+    val = cell.value
+    if val is None:
+        return ''
+    if isinstance(val, (int, float)):
+        fmt = cell.number_format or ''
+        if ',' in fmt:
+            # #,##0 계열 서식 → 콤마 포맷 적용
+            if isinstance(val, float) and val != int(val):
+                decimals = len(fmt.split('.')[-1]) if '.' in fmt else 0
+                return f"{val:,.{decimals}f}"
+            return f"{int(val):,}"
+        return str(int(val)) if isinstance(val, float) and val == int(val) else str(val)
+    return str(val)
+
+
 def send_bulk_mail(sender, recipients, subject_template, body_template, is_test=False):
     logger.info(f"단체 메일 발송 시작 - 수신자 수: {len(recipients)}, 테스트: {is_test}")
     smtp = smtp_setting(sender, 'ZnR2endqZWJieWt3cHdjZw==')
@@ -629,16 +647,17 @@ def bulk_mail():
 
         if excel_file and excel_file.filename:
             try:
-                df = pd.read_excel(excel_file)
-                col_names = list(df.columns)
-                email_col = col_names[0]
-                var_cols = col_names[1:]
+                wb = load_workbook(excel_file, data_only=True)
+                ws = wb.active
+                headers = [str(cell.value) for cell in ws[1] if cell.value is not None]
+                email_col = headers[0]
+                var_cols = headers[1:]
 
                 recipients = []
-                for _, row in df.iterrows():
-                    record = {'email': str(row[email_col]).strip()}
-                    for col in var_cols:
-                        record[col] = str(row[col]) if pd.notna(row[col]) else ''
+                for row in ws.iter_rows(min_row=2, max_col=len(headers)):
+                    record = {'email': _cell_display_value(row[0]).strip()}
+                    for i, col in enumerate(var_cols):
+                        record[col] = _cell_display_value(row[i + 1])
                     recipients.append(record)
 
                 with open(temp_file, 'w', encoding='utf-8') as f:
@@ -693,7 +712,7 @@ def bulk_mail():
 
 if __name__ == '__main__':
     app.logger.info("=" * 60)
-    app.logger.info("HINE Attendance Management 서버 시작")
+    app.logger.info("HNINE Attendance Management 서버 시작")
     app.logger.info("=" * 60)
     app.run(host="0.0.0.0", port=5001)
     #app.run(port=5001)
