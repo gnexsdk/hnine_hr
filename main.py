@@ -321,9 +321,9 @@ def rip_mail():
 # ============================================================
 def check_night_shift(x):
     if isinstance(x, list):
-        return "야간 근무" in x
+        return "연장(야간) 근무" in x
     elif isinstance(x, str):
-        return "야간 근무" in x
+        return "연장(야간) 근무" in x
     else:
         return False
 
